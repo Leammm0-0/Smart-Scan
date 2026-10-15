@@ -4,6 +4,7 @@ import smartscan.model.Cart;
 import smartscan.repository.ProductRepository;
 import smartscan.service.CameraService;
 import smartscan.service.QRCodeGenerator;
+import smartscan.service.OrderHistoryService;
 import smartscan.service.SmartScanner;
 
 import javax.swing.JFrame;
@@ -23,6 +24,7 @@ import java.nio.file.Paths;
  */
 public class MainFrame extends JFrame {
     private static final Path PRODUCT_CSV = Paths.get("products.csv");
+    private static final Path ORDER_HISTORY_FILE = Paths.get("order_history.txt");
 
     private static final String HOME = "HOME";
     private static final String SCAN = "SCAN";
@@ -35,6 +37,7 @@ public class MainFrame extends JFrame {
     private final SmartScanner smartScanner = new SmartScanner(repository, cart);
     private final CameraService camera = new CameraService();
     private final QRCodeGenerator qrGenerator = new QRCodeGenerator();
+    private final OrderHistoryService orderHistory = new OrderHistoryService(ORDER_HISTORY_FILE);
 
     // ---- 4 หน้า ----
     private final HomePage homePage = new HomePage(cart, this::showScan);
@@ -114,8 +117,20 @@ public class MainFrame extends JFrame {
         cards.show(root, PAYMENT);
     }
 
-    /** กด "Back to home" ในหน้า Payment = จบการซื้อ: ล้างตะกร้าแล้วกลับหน้าแรก */
+    /** กด "Back to home" ในหน้า Payment = จบการซื้อ: บันทึกประวัติ แล้วล้างตะกร้า */
     private void finishPayment() {
+        try {
+            // ต้องบันทึกก่อน clear() เพราะในไฟล์ต้องมีรายการสินค้าของออเดอร์นี้
+            orderHistory.saveOrder(cart);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "บันทึกประวัติออเดอร์ไม่สำเร็จ\nไฟล์: "
+                            + orderHistory.getHistoryFile().toAbsolutePath()
+                            + "\n\n" + ex.getMessage(),
+                    "Order history error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         cart.clear();
         scanPage.refresh();
         showHome();
